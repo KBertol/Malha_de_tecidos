@@ -1,0 +1,4 @@
+/home/karla/Documentos/Udesc/5_fase/CGR/cloth_sim/build/CMakeFiles/glad.dir
+/home/karla/Documentos/Udesc/5_fase/CGR/cloth_sim/build/CMakeFiles/cloth_sim.dir
+/home/karla/Documentos/Udesc/5_fase/CGR/cloth_sim/build/CMakeFiles/edit_cache.dir
+/home/karla/Documentos/Udesc/5_fase/CGR/cloth_sim/build/CMakeFiles/rebuild_cache.dir
