@@ -5,64 +5,81 @@
 #include <sstream>
 #include <iostream>
 
-std::string Shader::readFile(const char* path)
+std::string Shader::lerArquivo(const char* caminho)
 {
-    std::ifstream file(path);
-    if (!file.is_open()) {
-        std::cerr << "Erro ao abrir arquivo de shader: " << path << std::endl;
+    std::ifstream arquivo(caminho);
+    if (!arquivo.is_open()) {
+        std::cerr << "Erro ao abrir arquivo de shader: " << caminho << std::endl;
         return "";
     }
     std::stringstream ss;
-    ss << file.rdbuf();
+    ss << arquivo.rdbuf();
     return ss.str();
 }
 
-unsigned int Shader::compile(const char* source, unsigned int type)
+unsigned int Shader::compilar(const char* codigo, unsigned int tipo)
 {
-    unsigned int shader = glCreateShader(type);
-    glShaderSource(shader, 1, &source, nullptr);
+    unsigned int shader = glCreateShader(tipo);
+    glShaderSource(shader, 1, &codigo, nullptr);
     glCompileShader(shader);
-    int success;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(shader, 512, nullptr, infoLog);
-        std::cerr << "Erro ao compilar shader: " << infoLog << std::endl;
+
+    int sucesso;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &sucesso);
+    if (!sucesso) {
+        char log[512];
+        glGetShaderInfoLog(shader, 512, nullptr, log);
+        std::cerr << "Erro ao compilar shader: " << log << std::endl;
     }
     return shader;
 }
 
-Shader::Shader(const char* vertexPath, const char* fragmentPath)
+Shader::Shader(const char* caminhoVertex, const char* caminhoFragment)
 {
-    std::string vertexCode = readFile(vertexPath);
-    std::string fragmentCode = readFile(fragmentPath);
-    unsigned int vertex = compile(vertexCode.c_str(), GL_VERTEX_SHADER);
-    unsigned int fragment = compile(fragmentCode.c_str(), GL_FRAGMENT_SHADER);
-    programID = glCreateProgram();
-    glAttachShader(programID, vertex);
-    glAttachShader(programID, fragment);
-    glLinkProgram(programID);
-    int success;
-    glGetProgramiv(programID, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetProgramInfoLog(programID, 512, nullptr, infoLog);
-        std::cerr << "Erro ao linkar programa de shader: " << infoLog << std::endl;
+    std::string codigoVertex   = lerArquivo(caminhoVertex);
+    std::string codigoFragment = lerArquivo(caminhoFragment);
+
+    unsigned int vertex   = compilar(codigoVertex.c_str(),   GL_VERTEX_SHADER);
+    unsigned int fragment = compilar(codigoFragment.c_str(), GL_FRAGMENT_SHADER);
+
+    idPrograma = glCreateProgram();
+    glAttachShader(idPrograma, vertex);
+    glAttachShader(idPrograma, fragment);
+    glLinkProgram(idPrograma);
+
+    int sucesso;
+    glGetProgramiv(idPrograma, GL_LINK_STATUS, &sucesso);
+    if (!sucesso) {
+        char log[512];
+        glGetProgramInfoLog(idPrograma, 512, nullptr, log);
+        std::cerr << "Erro ao linkar programa de shader: " << log << std::endl;
     }
+
     glDeleteShader(vertex);
     glDeleteShader(fragment);
 }
 
-void Shader::use() const { glUseProgram(programID); }
-
-void Shader::setMat4(const std::string& name, const glm::mat4& mat) const {
-    glUniformMatrix4fv(glGetUniformLocation(programID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
+void Shader::usar() const
+{
+    glUseProgram(idPrograma);
 }
 
-void Shader::setVec3(const std::string& name, const glm::vec3& vec) const {
-    glUniform3fv(glGetUniformLocation(programID, name.c_str()), 1, glm::value_ptr(vec));
+void Shader::enviarMat4(const std::string& nome, const glm::mat4& mat) const
+{
+    glUniformMatrix4fv(
+        glGetUniformLocation(idPrograma, nome.c_str()),
+        1, GL_FALSE, glm::value_ptr(mat)
+    );
 }
 
-void Shader::setFloat(const std::string& name, float value) const {
-    glUniform1f(glGetUniformLocation(programID, name.c_str()), value);
+void Shader::enviarVec3(const std::string& nome, const glm::vec3& vec) const
+{
+    glUniform3fv(
+        glGetUniformLocation(idPrograma, nome.c_str()),
+        1, glm::value_ptr(vec)
+    );
+}
+
+void Shader::enviarFloat(const std::string& nome, float valor) const
+{
+    glUniform1f(glGetUniformLocation(idPrograma, nome.c_str()), valor);
 }

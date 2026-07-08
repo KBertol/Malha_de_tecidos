@@ -11,82 +11,90 @@
 #include <algorithm>
 #include <cmath>
 
-const unsigned int SCR_WIDTH = 1024;
-const unsigned int SCR_HEIGHT = 768;
+// ---------- Configurações da janela ----------
+const unsigned int LARGURA_TELA = 1024;
+const unsigned int ALTURA_TELA  = 768;
 
-float cameraDistance = 40.0f;
-float cameraYaw = -60.0f;
-float cameraPitch = 18.0f;
-glm::vec3 cameraTarget(0.0f, -4.0f, 0.0f);
+// ---------- Câmera orbital ----------
+float distanciaCamera = 40.0f;
+float yawCamera       = -60.0f;  // graus, rotação horizontal
+float pitchCamera     = 18.0f;   // graus, rotação vertical
+glm::vec3 alvoCamera(0.0f, -4.0f, 0.0f); // ponto que a câmera olha
 
-bool wireframe = false;
-bool windEnabled = true;
-float windStrength = 7.0f;
+// ---------- Estado da simulação ----------
+bool modoArame    = false; // V = alterna wireframe (mostra a malha de triângulos)
+bool ventoAtivo   = true;  // F = liga/desliga o vento
+float forcaVento  = 7.0f;
 
-// Posição normalizada do mouse: (-1,-1) canto superior esquerdo,
-// (1,1) canto inferior direito, (0,0) centro da janela.
-// Atualizada pelo callback do cursor a cada movimento do mouse.
-float mouseNormX = 0.0f;
-float mouseNormZ = 0.0f;
+// Controla a direção do vento
+float mousePosX = 0.0f; 
+float mousePosZ = 0.0f; 
 
-const float RODY = 6.0f;
-const float RODHALFLEN = 8.0f;
-const float FLOORY = -9.0f;
+// ---------- Geometria da cena ----------
+const float ALTURA_HASTE  = 6.0f;   
+const float METADE_HASTE  = 8.0f;   
+const float ALTURA_CHAO   = -9.0f; 
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
-    glViewport(0, 0, width, height);
+void callback_redimensionar(GLFWwindow* janela, int largura, int altura) {
+    glViewport(0, 0, largura, altura);
 }
 
-// Chamado automaticamente pelo GLFW a cada movimento do mouse.
-// Converte a posição em pixels para o intervalo [-1, 1] em cada eixo,
-// com (0,0) no centro da janela. Esses valores viram a direção do vento.
-void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
-    mouseNormX = (float)(xpos / SCR_WIDTH  * 2.0 - 1.0); // -1=esquerda, 1=direita
-    mouseNormZ = (float)(ypos / SCR_HEIGHT * 2.0 - 1.0); // -1=topo,     1=baixo
+void callback_mouse(GLFWwindow* janela, double posX, double posY) {
+    mousePosX = (float)(posX / LARGURA_TELA * 2.0 - 1.0);
+    mousePosZ = (float)(posY / ALTURA_TELA  * 2.0 - 1.0);
 }
 
-void processInput(GLFWwindow* window) {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, true);
-    float camSpeed = 1.0f;
-    if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) cameraYaw   -= camSpeed;
-    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) cameraYaw   += camSpeed;
-    if (glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS) cameraPitch += camSpeed;
-    if (glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS) cameraPitch -= camSpeed;
-    if (glfwGetKey(window, GLFW_KEY_W)     == GLFW_PRESS) cameraDistance -= 0.5f;
-    if (glfwGetKey(window, GLFW_KEY_S)     == GLFW_PRESS) cameraDistance += 0.5f;
-    cameraPitch = std::clamp(cameraPitch, -89.0f, 89.0f);
-    cameraDistance = std::clamp(cameraDistance, 5.0f, 100.0f);
+void processarEntrada(GLFWwindow* janela) {
+    if (glfwGetKey(janela, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        glfwSetWindowShouldClose(janela, true);
+
+    float velocidadeCamera = 1.0f;
+    if (glfwGetKey(janela, GLFW_KEY_LEFT)  == GLFW_PRESS) yawCamera   -= velocidadeCamera;
+    if (glfwGetKey(janela, GLFW_KEY_RIGHT) == GLFW_PRESS) yawCamera   += velocidadeCamera;
+    if (glfwGetKey(janela, GLFW_KEY_UP)    == GLFW_PRESS) pitchCamera += velocidadeCamera;
+    if (glfwGetKey(janela, GLFW_KEY_DOWN)  == GLFW_PRESS) pitchCamera -= velocidadeCamera;
+    if (glfwGetKey(janela, GLFW_KEY_W)     == GLFW_PRESS) distanciaCamera -= 0.5f;
+    if (glfwGetKey(janela, GLFW_KEY_S)     == GLFW_PRESS) distanciaCamera += 0.5f;
+
+    pitchCamera     = std::clamp(pitchCamera,     -89.0f, 89.0f);
+    distanciaCamera = std::clamp(distanciaCamera,   5.0f, 100.0f);
 }
 
-void processToggleKeys(GLFWwindow* window) {
-    static bool vPrev = false, fPrev = false;
-    bool vNow = glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS;
-    if (vNow && !vPrev) wireframe = !wireframe;
-    vPrev = vNow;
-    bool fNow = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
-    if (fNow && !fPrev) windEnabled = !windEnabled;
-    fPrev = fNow;
+void processarAlternancia(GLFWwindow* janela) {
+    static bool vAnterior = false, fAnterior = false;
+
+    bool vAgora = glfwGetKey(janela, GLFW_KEY_V) == GLFW_PRESS;
+    if (vAgora && !vAnterior) modoArame = !modoArame;
+    vAnterior = vAgora;
+
+    bool fAgora = glfwGetKey(janela, GLFW_KEY_F) == GLFW_PRESS;
+    if (fAgora && !fAnterior) ventoAtivo = !ventoAtivo;
+    fAnterior = fAgora;
 }
 
-unsigned int createStaticVAO(const std::vector<float>& vertexData, unsigned int& outVBO) {
+// Cria um VAO + VBO para geometria estática (chão e haste).
+unsigned int criarVAOEstatico(const std::vector<float>& vertices, unsigned int& vboSaida) {
     unsigned int vao, vbo;
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
+
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertexData.size() * sizeof(float), vertexData.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float),
+                 vertices.data(), GL_STATIC_DRAW);
+
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
-    outVBO = vbo;
+
+    vboSaida = vbo;
     return vao;
 }
 
 int main() {
-    glfwSetErrorCallback([](int code, const char* description) {
-        std::cerr << "Erro GLFW [" << code << "]: " << description << std::endl;
+    glfwSetErrorCallback([](int codigo, const char* descricao) {
+        std::cerr << "Erro GLFW [" << codigo << "]: " << descricao << std::endl;
     });
 
     if (!glfwInit()) {
@@ -98,20 +106,18 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT,
+    GLFWwindow* janela = glfwCreateWindow(LARGURA_TELA, ALTURA_TELA,
         "Simulacao de Tecido - Varal/Cortina", nullptr, nullptr);
-    if (!window) {
+    if (!janela) {
         std::cerr << "Falha ao criar janela GLFW" << std::endl;
         glfwTerminate();
         return -1;
     }
-    glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, cursor_position_callback);
 
-    // glad substitui o GLEW: carrega os ponteiros de funcao OpenGL
-    // via glfwGetProcAddress, sem depender de checagens via GLX que
-    // causavam o bug "Unknown error" com GLEW 2.2.0 + Mesa 26.
+    glfwMakeContextCurrent(janela);
+    glfwSetFramebufferSizeCallback(janela, callback_redimensionar);
+    glfwSetCursorPosCallback(janela, callback_mouse);
+
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) {
         std::cerr << "Falha ao inicializar o glad" << std::endl;
         glfwTerminate();
@@ -121,131 +127,146 @@ int main() {
     std::cout << "OpenGL: " << glGetString(GL_VERSION) << std::endl;
     std::cout << "Renderer: " << glGetString(GL_RENDERER) << std::endl;
 
-    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST); 
 
-    // Cria o tecido
-    Cloth cloth(30, 30, 0.5f, 0.1f);
-    // ks menores e mais subpassos = simulação estável sem explodir.
-    // Molas muito rígidas (ks alto) com dt grande causam instabilidade
-    // numérica no integrador de Euler — o tecido "explode" em 1-2 frames.
-    cloth.createSprings(200.0f, 8.0f, 150.0f, 6.0f, 100.0f, 4.0f);
-    cloth.buildMesh();
+    // ---------- Cria o tecido ----------
+    Tecido tecido(30, 30, 0.5f, 0.1f);
+    tecido.criarMolas(200.0f, 8.0f,   // estrutural: ks, kd
+                      150.0f, 6.0f,   // shear: ks, kd
+                      100.0f, 4.0f);  // bend: ks, kd
+    tecido.construirMalha();
 
-    float clothWidthWorld = (cloth.width - 1) * cloth.spacing;
-    for (auto& p : cloth.particles)
-        p.position += glm::vec3(-clothWidthWorld * 0.5f, RODY, 0.0f);
+    float larguraMundo = (tecido.largura - 1) * tecido.espacamento;
+    for (auto& p : tecido.particulas)
+        p.posicao += glm::vec3(-larguraMundo * 0.5f, ALTURA_HASTE, 0.0f);
 
-    for (int x = 0; x < cloth.width; x += 4)
-        cloth.setFixed(x, 0, true);
-    cloth.setFixed(cloth.width - 1, 0, true);
+    for (int x = 0; x < tecido.largura; x += 4)
+        tecido.fixarParticula(x, 0, true);
+    tecido.fixarParticula(tecido.largura - 1, 0, true); // garante a última coluna
 
-    cloth.floorY = FLOORY;
-    cloth.floorCollisionEnabled = true;
+    tecido.alturaChao = ALTURA_CHAO;
+    tecido.colisaoChaoAtiva = true;
 
-    Shader sceneShader("shaders/cloth.vert", "shaders/cloth.frag");
+    // ---------- Shader (compartilhado por tecido, chão e haste) ----------
+    Shader shaderCena("shaders/cloth.vert", "shaders/cloth.frag");
 
-    // Buffers do tecido (dinamico)
-    unsigned int clothVAO, clothVBO, clothEBO;
-    glGenVertexArrays(1, &clothVAO);
-    glGenBuffers(1, &clothVBO);
-    glGenBuffers(1, &clothEBO);
-    glBindVertexArray(clothVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, clothVBO);
-    glBufferData(GL_ARRAY_BUFFER, cloth.getVertexData().size() * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, clothEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, cloth.indices.size() * sizeof(unsigned int), cloth.indices.data(), GL_STATIC_DRAW);
+    // ---------- Buffers do tecido (dinâmico — atualizado todo frame) ----------
+    unsigned int vaoTecido, vboTecido, eboTecido;
+    glGenVertexArrays(1, &vaoTecido);
+    glGenBuffers(1, &vboTecido);
+    glGenBuffers(1, &eboTecido);
+
+    glBindVertexArray(vaoTecido);
+    glBindBuffer(GL_ARRAY_BUFFER, vboTecido);
+    glBufferData(GL_ARRAY_BUFFER,
+                 tecido.obterDadosVertices().size() * sizeof(float),
+                 nullptr, GL_DYNAMIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eboTecido);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                 tecido.indices.size() * sizeof(unsigned int),
+                 tecido.indices.data(), GL_STATIC_DRAW);
+
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    // Buffers do chao e da haste (estaticos)
-    std::vector<float> floorData = Scene::buildFloor(FLOORY, 30.0f, 0.0f, 0.0f);
-    unsigned int floorVBO, floorVAO = createStaticVAO(floorData, floorVBO);
-    int floorVertexCount = (int)(floorData.size() / 6);
+    // ---------- Buffers do chão e da haste (estáticos) ----------
+    std::vector<float> verticesChao = Cenario::construirChao(ALTURA_CHAO, 30.0f, 0.0f, 0.0f);
+    unsigned int vboChao, vaoChao = criarVAOEstatico(verticesChao, vboChao);
+    int qtdVerticesChao = (int)(verticesChao.size() / 6);
 
-    std::vector<float> rodData = Scene::buildRod(-RODHALFLEN, RODHALFLEN, RODY, 0.0f, 0.15f, 16);
-    unsigned int rodVBO, rodVAO = createStaticVAO(rodData, rodVBO);
-    int rodVertexCount = (int)(rodData.size() / 6);
+    std::vector<float> verticesHaste = Cenario::construirHaste(
+        -METADE_HASTE, METADE_HASTE, ALTURA_HASTE, 0.0f, 0.15f, 16);
+    unsigned int vboHaste, vaoHaste = criarVAOEstatico(verticesHaste, vboHaste);
+    int qtdVerticesHaste = (int)(verticesHaste.size() / 6);
 
-    float lastFrame = 0.0f;
+    // ---------- Loop principal ----------
+    float frameAnterior = 0.0f;
 
-    while (!glfwWindowShouldClose(window)) {
-        float currentFrame = static_cast<float>(glfwGetTime());
-        float deltaTime = std::min(currentFrame - lastFrame, 0.02f);
-        lastFrame = currentFrame;
+    while (!glfwWindowShouldClose(janela)) {
+        float frameAtual = static_cast<float>(glfwGetTime());
+        float deltaTempo = std::min(frameAtual - frameAnterior, 0.02f); // limita passo máximo
+        frameAnterior = frameAtual;
 
-        processInput(window);
-        processToggleKeys(window);
+        processarEntrada(janela);
+        processarAlternancia(janela);
 
-        glm::vec3 gravity(0.0f, -9.8f, 0.0f);
-        glm::vec3 wind(0.0f);
-        if (windEnabled) {
-            // A posição normalizada do mouse [-1, 1] define a direção
-            // e intensidade do vento nos eixos X e Z.
-            // Mouse no centro = sem vento. Mouse na borda = vento máximo.
-            // Um leve vento base oscilante é somado para o tecido nunca
-            // ficar completamente parado quando o mouse está no centro.
-            float baseWind = 1.5f * std::sin(currentFrame * 0.8f);
-            wind = glm::vec3(
-                windStrength * mouseNormX + baseWind,
+        // --- Atualiza a física ---
+        glm::vec3 gravidade(0.0f, -9.8f, 0.0f);
+        glm::vec3 vento(0.0f);
+        if (ventoAtivo) {
+
+            float ventoBase = 1.5f * std::sin(frameAtual * 0.8f);
+            vento = glm::vec3(
+                forcaVento * mousePosX + ventoBase,
                 0.0f,
-                windStrength * mouseNormZ
+                forcaVento * mousePosZ
             );
         }
 
-        cloth.update(deltaTime, gravity, wind, 8);
+        tecido.atualizar(deltaTempo, gravidade, vento, 8 /* subpassos */);
 
-        std::vector<float> vertexData = cloth.getVertexData();
-        glBindBuffer(GL_ARRAY_BUFFER, clothVBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, vertexData.size() * sizeof(float), vertexData.data());
+        // --- Atualiza o VBO do tecido com as novas posições/normais ---
+        std::vector<float> dadosVertices = tecido.obterDadosVertices();
+        glBindBuffer(GL_ARRAY_BUFFER, vboTecido);
+        glBufferSubData(GL_ARRAY_BUFFER, 0,
+                        dadosVertices.size() * sizeof(float),
+                        dadosVertices.data());
 
+        // --- Renderização ---
         glClearColor(0.12f, 0.13f, 0.16f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
+        glPolygonMode(GL_FRONT_AND_BACK, modoArame ? GL_LINE : GL_FILL);
 
-        sceneShader.use();
+        shaderCena.usar();
 
-        float yawRad = glm::radians(cameraYaw);
-        float pitchRad = glm::radians(cameraPitch);
-        glm::vec3 cameraOffset(
-            cameraDistance * std::cos(pitchRad) * std::cos(yawRad),
-            cameraDistance * std::sin(pitchRad),
-            cameraDistance * std::cos(pitchRad) * std::sin(yawRad)
+        float yawRad   = glm::radians(yawCamera);
+        float pitchRad = glm::radians(pitchCamera);
+        glm::vec3 posicaoCamera = alvoCamera + glm::vec3(
+            distanciaCamera * std::cos(pitchRad) * std::cos(yawRad),
+            distanciaCamera * std::sin(pitchRad),
+            distanciaCamera * std::cos(pitchRad) * std::sin(yawRad)
         );
-        glm::vec3 cameraPos = cameraTarget + cameraOffset;
 
-        glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, glm::vec3(0.0f, 1.0f, 0.0f));
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f),
-            (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        glm::mat4 model = glm::mat4(1.0f);
+        glm::mat4 matrizVisao = glm::lookAt(posicaoCamera, alvoCamera, glm::vec3(0, 1, 0));
+        glm::mat4 matrizProjecao = glm::perspective(
+            glm::radians(45.0f),
+            (float)LARGURA_TELA / (float)ALTURA_TELA,
+            0.1f, 100.0f
+        );
+        glm::mat4 matrizModelo = glm::mat4(1.0f); // identidade (sem transformação extra)
 
-        sceneShader.setMat4("model", model);
-        sceneShader.setMat4("view", view);
-        sceneShader.setMat4("projection", projection);
-        sceneShader.setVec3("viewPos", cameraPos);
-        sceneShader.setVec3("lightPos", glm::vec3(8.0f, 14.0f, 10.0f));
-        sceneShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 0.97f));
+        shaderCena.enviarMat4("model",      matrizModelo);
+        shaderCena.enviarMat4("view",       matrizVisao);
+        shaderCena.enviarMat4("projection", matrizProjecao);
+        shaderCena.enviarVec3("viewPos",    posicaoCamera);
+        shaderCena.enviarVec3("lightPos",   glm::vec3(8.0f, 14.0f, 10.0f));
+        shaderCena.enviarVec3("lightColor", glm::vec3(1.0f, 1.0f, 0.97f));
 
-        sceneShader.setVec3("objectColor", glm::vec3(0.35f, 0.35f, 0.38f));
-        glBindVertexArray(floorVAO);
-        glDrawArrays(GL_TRIANGLES, 0, floorVertexCount);
+        // Desenha o chão (cinza)
+        shaderCena.enviarVec3("objectColor", glm::vec3(0.35f, 0.35f, 0.38f));
+        glBindVertexArray(vaoChao);
+        glDrawArrays(GL_TRIANGLES, 0, qtdVerticesChao);
 
-        sceneShader.setVec3("objectColor", glm::vec3(0.55f, 0.55f, 0.58f));
-        glBindVertexArray(rodVAO);
-        glDrawArrays(GL_TRIANGLES, 0, rodVertexCount);
+        // Desenha a haste (cinza claro)
+        shaderCena.enviarVec3("objectColor", glm::vec3(0.55f, 0.55f, 0.58f));
+        glBindVertexArray(vaoHaste);
+        glDrawArrays(GL_TRIANGLES, 0, qtdVerticesHaste);
 
-        sceneShader.setVec3("objectColor", glm::vec3(0.75f, 0.25f, 0.3f));
-        glBindVertexArray(clothVAO);
-        glDrawElements(GL_TRIANGLES, (GLsizei)cloth.indices.size(), GL_UNSIGNED_INT, 0);
+        // Desenha o tecido (vermelho)
+        shaderCena.enviarVec3("objectColor", glm::vec3(0.75f, 0.25f, 0.3f));
+        glBindVertexArray(vaoTecido);
+        glDrawElements(GL_TRIANGLES, (GLsizei)tecido.indices.size(), GL_UNSIGNED_INT, 0);
 
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+        glfwSwapBuffers(janela); // troca os buffers (double buffering)
+        glfwPollEvents();        // processa eventos de teclado/mouse
     }
+    glDeleteVertexArrays(1, &vaoTecido); glDeleteBuffers(1, &vboTecido); glDeleteBuffers(1, &eboTecido);
+    glDeleteVertexArrays(1, &vaoChao);   glDeleteBuffers(1, &vboChao);
+    glDeleteVertexArrays(1, &vaoHaste);  glDeleteBuffers(1, &vboHaste);
 
-    glDeleteVertexArrays(1, &clothVAO); glDeleteBuffers(1, &clothVBO); glDeleteBuffers(1, &clothEBO);
-    glDeleteVertexArrays(1, &floorVAO); glDeleteBuffers(1, &floorVBO);
-    glDeleteVertexArrays(1, &rodVAO);   glDeleteBuffers(1, &rodVBO);
     glfwTerminate();
     return 0;
 }

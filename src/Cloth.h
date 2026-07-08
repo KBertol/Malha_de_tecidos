@@ -4,25 +4,31 @@
 #include <vector>
 #include <glm/glm.hpp>
 
-class Cloth {
+class Tecido {
 public:
-    int width, height;
-    float spacing;
-    bool floorCollisionEnabled = true;
-    float floorY = -12.0f;
+    int largura, altura;  // número de partículas em cada dimensão da grade
+    float espacamento;    // distância entre partículas vizinhas no repouso
 
-    std::vector<Particle> particles;
-    std::vector<Spring> springs;
-    std::vector<unsigned int> indices;
+    bool colisaoChaoAtiva = true;
+    float alturaChao = -12.0f;
 
-    Cloth(int w, int h, float spacing, float particleMass);
-    Particle& at(int x, int y) { return particles[y * width + x]; }
-    void createSprings(float ksStruct, float kdStruct, float ksShear, float kdShear, float ksBend, float kdBend);
-    void buildMesh();
-    void applyExternalForces(const glm::vec3& gravity, const glm::vec3& wind);
-    void update(float dt, const glm::vec3& gravity, const glm::vec3& wind, int numSubSteps);
-    void computeNormals();
-    void resolveFloorCollision(float floorY, float restitution = 0.3f);
-    void setFixed(int x, int y, bool fixed);
-    std::vector<float> getVertexData() const;
+    std::vector<Particula> particulas;
+    std::vector<Mola> molas;
+    std::vector<unsigned int> indices; 
+
+    Tecido(int largura, int altura, float espacamento, float massaParticula);
+
+    Particula& em(int x, int y) { return particulas[y * largura + x]; }
+
+    void criarMolas(float ksEstrutural, float kdEstrutural,
+                    float ksShear,      float kdShear,
+                    float ksBend,       float kdBend);
+
+    void construirMalha();
+    void aplicarForcasExternas(const glm::vec3& gravidade, const glm::vec3& vento);
+    void atualizar(float dt, const glm::vec3& gravidade, const glm::vec3& vento, int numSubPassos);
+    void calcularNormais();
+    void resolverColisaoChao(float alturaChao, float restituicao = 0.3f);
+    void fixarParticula(int x, int y, bool fixa);
+    std::vector<float> obterDadosVertices() const;
 };

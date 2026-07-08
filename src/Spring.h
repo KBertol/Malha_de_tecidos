@@ -2,28 +2,38 @@
 #include "Particle.h"
 #include <glm/glm.hpp>
 
-enum class SpringType { STRUCTURAL, SHEAR, BEND };
+// Tipos de mola 
+enum class TipoMola { STRUCTURAL, SHEAR, BEND };
 
-class Spring {
+class Mola {
 public:
-    Particle* p1; Particle* p2;
-    float restLength, ks, kd;
-    SpringType type;
+    Particula* p1;
+    Particula* p2;
+    float comprimentoRepouso; 
+    float ks;                 // rigidez da mola (constante elástica de Hooke)
+    float kd;                 // amortecimento (dissipa energia, evita oscilar para sempre)
+    TipoMola tipo;
 
-    Spring(Particle* a, Particle* b, float stiffness, float damping, SpringType t)
-        : p1(a), p2(b), ks(stiffness), kd(damping), type(t)
-    { restLength = glm::length(p1->position - p2->position); }
+    Mola(Particula* a, Particula* b, float rigidez, float amortecimento, TipoMola t)
+        : p1(a), p2(b), ks(rigidez), kd(amortecimento), tipo(t)
+    {
+        comprimentoRepouso = glm::length(p1->posicao - p2->posicao);
+    }
+    void aplicarForca() {
+        glm::vec3 delta = p1->posicao - p2->posicao;
+        float comprimentoAtual = glm::length(delta);
 
-    void applyForce() {
-        glm::vec3 delta = p1->position - p2->position;
-        float currentLength = glm::length(delta);
-        if (currentLength < 1e-6f) return;
-        glm::vec3 dir = delta / currentLength;
-        float stretch = currentLength - restLength;
-        float dampingTerm = glm::dot(p1->velocity - p2->velocity, dir);
-        float forceMagnitude = -(ks * stretch + kd * dampingTerm);
-        glm::vec3 force = forceMagnitude * dir;
-        p1->addForce(force);
-        p2->addForce(-force);
+        if (comprimentoAtual < 1e-6f) return; 
+
+        glm::vec3 direcao = delta / comprimentoAtual; 
+
+        float deformacao     = comprimentoAtual - comprimentoRepouso;
+        float velocRelativa  = glm::dot(p1->velocidade - p2->velocidade, direcao);
+        float magnitudeForca = -(ks * deformacao + kd * velocRelativa);
+
+        glm::vec3 forca = magnitudeForca * direcao;
+
+        p1->adicionarForca(forca);   // ação
+        p2->adicionarForca(-forca);  // reação 
     }
 };
