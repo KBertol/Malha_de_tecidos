@@ -18,8 +18,6 @@ public:
     void adicionarForca(const glm::vec3& f) { forca += f; }
 
     // Integração de Euler semi-implícito:
-    //   v(t+dt) = v(t) + a(t)*dt     onde a = F/m (2ª Lei de Newton)
-    //   x(t+dt) = x(t) + v(t+dt)*dt  usa o v já atualizado (mais estável)
     void integrar(float dt) {
         if (estaFixa) return;
         glm::vec3 aceleracao = forca / massa;
